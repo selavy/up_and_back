@@ -24,7 +24,16 @@ export default function GamePage() {
       return;
     }
     setPlayerName(stored);
-    setPlayers(JSON.parse(localStorage.getItem("players") || "[]"));
+
+    async function fetchPlayers() {
+      const res = await fetch("/api/players");
+      const data = await res.json();
+      setPlayers(data.players);
+    }
+
+    fetchPlayers();
+    const interval = setInterval(fetchPlayers, 5000);
+    return () => clearInterval(interval);
   }, [router]);
 
   if (!playerName) return null;

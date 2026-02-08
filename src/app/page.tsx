@@ -16,16 +16,17 @@ export default function WelcomePage() {
   const [name, setName] = useState("");
   const router = useRouter();
 
-  function handleJoin() {
+  async function handleJoin() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    localStorage.setItem("playerName", trimmed);
 
-    const existing: string[] = JSON.parse(localStorage.getItem("players") || "[]");
-    if (!existing.includes(trimmed)) {
-      existing.push(trimmed);
-      localStorage.setItem("players", JSON.stringify(existing));
-    }
+    const res = await fetch("/api/players", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: trimmed }),
+    });
+    const data = await res.json();
+    localStorage.setItem("playerName", data.name);
 
     router.push("/game");
   }
