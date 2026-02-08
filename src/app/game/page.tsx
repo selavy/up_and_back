@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
@@ -15,6 +16,7 @@ import {
 export default function GamePage() {
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [players, setPlayers] = useState<string[]>([]);
+  const [gameStarted, setGameStarted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -25,21 +27,57 @@ export default function GamePage() {
     }
     setPlayerName(stored);
 
-    async function fetchPlayers() {
-      const res = await fetch("/api/players");
-      const data = await res.json();
-      setPlayers(data.players);
+    async function poll() {
+      const [playersRes, gameRes] = await Promise.all([
+        fetch("/api/players"),
+        fetch("/api/game"),
+      ]);
+      const playersData = await playersRes.json();
+      const gameData = await gameRes.json();
+      setPlayers(playersData.players);
+      setGameStarted(gameData.started);
     }
 
-    fetchPlayers();
-    const interval = setInterval(fetchPlayers, 5000);
+    poll();
+    const interval = setInterval(poll, 5000);
     return () => clearInterval(interval);
   }, [router]);
+
+  async function handleStartGame() {
+    await fetch("/api/game", { method: "POST" });
+    setGameStarted(true);
+  }
+
+  async function handleEndGame() {
+    await fetch("/api/game", { method: "DELETE" });
+    setGameStarted(false);
+    setPlayers([]);
+    localStorage.removeItem("playerName");
+    router.replace("/");
+  }
+
+  const maxCards =
+    gameStarted && players.length > 0
+      ? Math.min(13, Math.floor(51 / players.length))
+      : 0;
 
   if (!playerName) return null;
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen flex-col items-center gap-6 p-6">
+      {gameStarted && maxCards > 0 && (
+        <div className="flex flex-wrap justify-center gap-2">
+          {Array.from({ length: maxCards }, (_, i) => (
+            <div
+              key={i}
+              className="flex h-24 w-16 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/50 text-xs text-muted-foreground"
+            >
+              {i + 1}
+            </div>
+          ))}
+        </div>
+      )}
+
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl">Up and Back</CardTitle>
@@ -70,6 +108,21 @@ export default function GamePage() {
               ))}
             </TableBody>
           </Table>
+
+          {gameStarted ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-center text-sm font-medium text-green-600">
+                Game started — {maxCards} cards max per player
+              </p>
+              <Button onClick={handleEndGame} variant="destructive" className="w-full">
+                End Game
+              </Button>
+            </div>
+          ) : (
+            <Button onClick={handleStartGame} className="w-full">
+              Start Game
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>
