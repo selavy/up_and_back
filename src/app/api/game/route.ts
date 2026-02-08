@@ -1,8 +1,16 @@
-import { NextResponse } from "next/server";
-import { isGameStarted, startGame, endGame, getCurrentRound } from "@/lib/db";
+import { NextRequest, NextResponse } from "next/server";
+import { isGameStarted, startGame, endGame, getCurrentRound, getPlayerCards, getTrumpCard } from "@/lib/db";
 
-export function GET() {
-  return NextResponse.json({ started: isGameStarted(), currentRound: getCurrentRound() });
+export function GET(request: NextRequest) {
+  const started = isGameStarted();
+  const currentRound = getCurrentRound();
+  const trumpCard = started ? getTrumpCard() : null;
+  const trumpSuit = trumpCard ? trumpCard.slice(-1) : null;
+
+  const player = request.nextUrl.searchParams.get("player");
+  const playerCards = player && started ? getPlayerCards(player) : [];
+
+  return NextResponse.json({ started, currentRound, trumpCard, trumpSuit, playerCards });
 }
 
 export function POST() {

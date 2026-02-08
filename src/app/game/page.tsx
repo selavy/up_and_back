@@ -18,7 +18,13 @@ export default function GamePage() {
   const [players, setPlayers] = useState<string[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
   const [currentRound, setCurrentRound] = useState(0);
+  const [playerCards, setPlayerCards] = useState<string[]>([]);
+  const [trumpCard, setTrumpCard] = useState<string | null>(null);
+  const [trumpSuit, setTrumpSuit] = useState<string | null>(null);
   const router = useRouter();
+
+  const suitSymbol: Record<string, string> = { H: "\u2665", D: "\u2666", C: "\u2663", S: "\u2660" };
+  const suitColor: Record<string, string> = { H: "text-red-600", D: "text-red-600", C: "text-black", S: "text-black" };
 
   useEffect(() => {
     const stored = localStorage.getItem("playerName");
@@ -31,13 +37,16 @@ export default function GamePage() {
     async function poll() {
       const [playersRes, gameRes] = await Promise.all([
         fetch("/api/players"),
-        fetch("/api/game"),
+        fetch(`/api/game?player=${encodeURIComponent(stored!)}`),
       ]);
       const playersData = await playersRes.json();
       const gameData = await gameRes.json();
       setPlayers(playersData.players);
       setGameStarted(gameData.started);
       setCurrentRound(gameData.currentRound);
+      setPlayerCards(gameData.playerCards ?? []);
+      setTrumpCard(gameData.trumpCard ?? null);
+      setTrumpSuit(gameData.trumpSuit ?? null);
     }
 
     poll();
@@ -72,15 +81,38 @@ export default function GamePage() {
   return (
     <div className="flex min-h-screen flex-col items-center gap-6 p-6">
       {gameStarted && maxCards > 0 && (
-        <div className="flex flex-wrap justify-center gap-2">
-          {Array.from({ length: maxCards }, (_, i) => (
-            <div
-              key={i}
-              className="flex h-24 w-16 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/50 text-xs text-muted-foreground"
-            >
-              {i + 1}
-            </div>
-          ))}
+        <div className="flex flex-col items-center gap-3">
+          <div className="flex flex-wrap justify-center gap-2">
+            {Array.from({ length: maxCards }, (_, i) => {
+              const card = playerCards[i];
+              if (card) {
+                const suit = card.slice(-1);
+                const rank = card.slice(0, -1);
+                return (
+                  <div
+                    key={i}
+                    className={`flex h-24 w-16 flex-col items-center justify-center rounded-lg border-2 border-foreground/20 bg-white shadow-sm ${suitColor[suit]}`}
+                  >
+                    <span className="text-sm font-bold">{rank}</span>
+                    <span className="text-lg">{suitSymbol[suit]}</span>
+                  </div>
+                );
+              }
+              return (
+                <div
+                  key={i}
+                  className="flex h-24 w-16 items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/50 text-xs text-muted-foreground"
+                >
+                  {i + 1}
+                </div>
+              );
+            })}
+          </div>
+          {trumpCard && trumpSuit && (
+            <p className={`text-sm font-medium ${suitColor[trumpSuit]}`}>
+              Trump: {trumpCard.slice(0, -1)}{suitSymbol[trumpSuit]} ({suitSymbol[trumpSuit]})
+            </p>
+          )}
         </div>
       )}
 
