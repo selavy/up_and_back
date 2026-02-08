@@ -24,7 +24,8 @@ db.exec(`
     started INTEGER NOT NULL DEFAULT 0,
     current_round INTEGER NOT NULL DEFAULT 0,
     deck TEXT NOT NULL DEFAULT '[]',
-    trump_card TEXT DEFAULT NULL
+    trump_card TEXT DEFAULT NULL,
+    dealer_index INTEGER NOT NULL DEFAULT 0
   )
 `);
 db.exec(`INSERT OR IGNORE INTO game_state (id, started, current_round) VALUES (1, 0, 0)`);
@@ -50,6 +51,9 @@ if (!columns.some((c) => c.name === "deck")) {
 if (!columns.some((c) => c.name === "trump_card")) {
   db.exec("ALTER TABLE game_state ADD COLUMN trump_card TEXT DEFAULT NULL");
 }
+if (!columns.some((c) => c.name === "dealer_index")) {
+  db.exec("ALTER TABLE game_state ADD COLUMN dealer_index INTEGER NOT NULL DEFAULT 0");
+}
 
 export function getAllPlayers(): string[] {
   const rows = db.prepare("SELECT name FROM players ORDER BY id").all() as { name: string }[];
@@ -59,6 +63,11 @@ export function getAllPlayers(): string[] {
 export function isGameStarted(): boolean {
   const row = db.prepare("SELECT started FROM game_state WHERE id = 1").get() as { started: number };
   return row.started === 1;
+}
+
+export function getDealerIndex(): number {
+  const row = db.prepare("SELECT dealer_index FROM game_state WHERE id = 1").get() as { dealer_index: number };
+  return row.dealer_index;
 }
 
 export function getCurrentRound(): number {
@@ -123,12 +132,14 @@ export function getTrumpCard(): string | null {
 
 export function startGame(): void {
   const deck = shuffleDeck(createDeck());
-  db.prepare("UPDATE game_state SET started = 1, current_round = 1, deck = ?, trump_card = NULL WHERE id = 1").run(JSON.stringify(deck));
+  const players = getAllPlayers();
+  const dealerIndex = Math.floor(Math.random() * players.length);
+  db.prepare("UPDATE game_state SET started = 1, current_round = 1, deck = ?, trump_card = NULL, dealer_index = ? WHERE id = 1").run(JSON.stringify(deck), dealerIndex);
   dealRound(1);
 }
 
 export function endGame(): void {
-  db.prepare("UPDATE game_state SET started = 0, current_round = 0, deck = '[]', trump_card = NULL WHERE id = 1").run();
+  db.prepare("UPDATE game_state SET started = 0, current_round = 0, deck = '[]', trump_card = NULL, dealer_index = 0 WHERE id = 1").run();
   db.prepare("DELETE FROM player_cards").run();
   db.prepare("DELETE FROM players").run();
 }

@@ -21,6 +21,7 @@ export default function GamePage() {
   const [playerCards, setPlayerCards] = useState<string[]>([]);
   const [trumpCard, setTrumpCard] = useState<string | null>(null);
   const [trumpSuit, setTrumpSuit] = useState<string | null>(null);
+  const [dealerIndex, setDealerIndex] = useState<number | null>(null);
   const router = useRouter();
 
   const suitSymbol: Record<string, string> = { H: "\u2665", D: "\u2666", C: "\u2663", S: "\u2660" };
@@ -47,6 +48,7 @@ export default function GamePage() {
       setPlayerCards(gameData.playerCards ?? []);
       setTrumpCard(gameData.trumpCard ?? null);
       setTrumpSuit(gameData.trumpSuit ?? null);
+      setDealerIndex(gameData.dealerIndex ?? null);
     }
 
     poll();
@@ -140,6 +142,9 @@ export default function GamePage() {
                     {name}
                     {name === playerName && (
                       <span className="ml-2 text-xs text-muted-foreground">(you)</span>
+                    )}
+                    {gameStarted && dealerIndex === i && (
+                      <span className="ml-2 text-xs text-muted-foreground">(dealer)</span>
                     )}
                   </TableCell>
                 </TableRow>

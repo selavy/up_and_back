@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isGameStarted, startGame, endGame, getCurrentRound, getPlayerCards, getTrumpCard } from "@/lib/db";
+import { isGameStarted, startGame, endGame, getCurrentRound, getPlayerCards, getTrumpCard, getDealerIndex, getAllPlayers } from "@/lib/db";
 
 export function GET(request: NextRequest) {
   const started = isGameStarted();
@@ -10,7 +10,16 @@ export function GET(request: NextRequest) {
   const player = request.nextUrl.searchParams.get("player");
   const playerCards = player && started ? getPlayerCards(player) : [];
 
-  return NextResponse.json({ started, currentRound, trumpCard, trumpSuit, playerCards });
+  let dealerIndex: number | null = null;
+  if (started) {
+    const players = getAllPlayers();
+    if (players.length > 0) {
+      const baseDealerIndex = getDealerIndex();
+      dealerIndex = (baseDealerIndex + currentRound - 1) % players.length;
+    }
+  }
+
+  return NextResponse.json({ started, currentRound, trumpCard, trumpSuit, playerCards, dealerIndex });
 }
 
 export function POST() {
