@@ -17,6 +17,7 @@ export default function GamePage() {
   const [playerName, setPlayerName] = useState<string | null>(null);
   const [players, setPlayers] = useState<string[]>([]);
   const [gameStarted, setGameStarted] = useState(false);
+  const [currentRound, setCurrentRound] = useState(0);
   const router = useRouter();
 
   useEffect(() => {
@@ -36,6 +37,7 @@ export default function GamePage() {
       const gameData = await gameRes.json();
       setPlayers(playersData.players);
       setGameStarted(gameData.started);
+      setCurrentRound(gameData.currentRound);
     }
 
     poll();
@@ -44,8 +46,10 @@ export default function GamePage() {
   }, [router]);
 
   async function handleStartGame() {
-    await fetch("/api/game", { method: "POST" });
+    const res = await fetch("/api/game", { method: "POST" });
+    const data = await res.json();
     setGameStarted(true);
+    setCurrentRound(data.currentRound);
   }
 
   async function handleEndGame() {
@@ -60,6 +64,8 @@ export default function GamePage() {
     gameStarted && players.length > 0
       ? Math.min(13, Math.floor(51 / players.length))
       : 0;
+
+  const totalRounds = maxCards * 2;
 
   if (!playerName) return null;
 
@@ -112,7 +118,7 @@ export default function GamePage() {
           {gameStarted ? (
             <div className="flex flex-col gap-3">
               <p className="text-center text-sm font-medium text-green-600">
-                Game started — {maxCards} cards max per player
+                Round {currentRound} of {totalRounds}
               </p>
               <Button onClick={handleEndGame} variant="destructive" className="w-full">
                 End Game

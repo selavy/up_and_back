@@ -21,10 +21,17 @@ db.exec(`
 db.exec(`
   CREATE TABLE IF NOT EXISTS game_state (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    started INTEGER NOT NULL DEFAULT 0
+    started INTEGER NOT NULL DEFAULT 0,
+    current_round INTEGER NOT NULL DEFAULT 0
   )
 `);
-db.exec(`INSERT OR IGNORE INTO game_state (id, started) VALUES (1, 0)`);
+db.exec(`INSERT OR IGNORE INTO game_state (id, started, current_round) VALUES (1, 0, 0)`);
+
+// Migrate: add current_round if table existed before this column was added
+const columns = db.prepare("PRAGMA table_info(game_state)").all() as { name: string }[];
+if (!columns.some((c) => c.name === "current_round")) {
+  db.exec("ALTER TABLE game_state ADD COLUMN current_round INTEGER NOT NULL DEFAULT 0");
+}
 
 export function getAllPlayers(): string[] {
   const rows = db.prepare("SELECT name FROM players ORDER BY id").all() as { name: string }[];
@@ -36,12 +43,21 @@ export function isGameStarted(): boolean {
   return row.started === 1;
 }
 
+export function getCurrentRound(): number {
+  const row = db.prepare("SELECT current_round FROM game_state WHERE id = 1").get() as { current_round: number };
+  return row.current_round;
+}
+
+export function setCurrentRound(round: number): void {
+  db.prepare("UPDATE game_state SET current_round = ? WHERE id = 1").run(round);
+}
+
 export function startGame(): void {
-  db.prepare("UPDATE game_state SET started = 1 WHERE id = 1").run();
+  db.prepare("UPDATE game_state SET started = 1, current_round = 1 WHERE id = 1").run();
 }
 
 export function endGame(): void {
-  db.prepare("UPDATE game_state SET started = 0 WHERE id = 1").run();
+  db.prepare("UPDATE game_state SET started = 0, current_round = 0 WHERE id = 1").run();
   db.prepare("DELETE FROM players").run();
 }
 
