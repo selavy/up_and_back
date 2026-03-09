@@ -40,6 +40,16 @@ db.exec(`
   )
 `);
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS player_bids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    round INTEGER NOT NULL,
+    player_name TEXT NOT NULL,
+    bid INTEGER NOT NULL,
+    UNIQUE(round, player_name)
+  )
+`);
+
 // Migrate: add columns if table existed before they were added
 const columns = db.prepare("PRAGMA table_info(game_state)").all() as { name: string }[];
 if (!columns.some((c) => c.name === "current_round")) {
@@ -54,6 +64,12 @@ if (!columns.some((c) => c.name === "trump_card")) {
 if (!columns.some((c) => c.name === "dealer_index")) {
   db.exec("ALTER TABLE game_state ADD COLUMN dealer_index INTEGER NOT NULL DEFAULT 0");
 }
+
+// Clear all state on server restart
+db.exec("DELETE FROM player_cards");
+db.exec("DELETE FROM player_bids");
+db.exec("DELETE FROM players");
+db.exec("UPDATE game_state SET started = 0, current_round = 0, deck = '[]', trump_card = NULL, dealer_index = 0 WHERE id = 1");
 
 export function getAllPlayers(): string[] {
   const rows = db.prepare("SELECT name FROM players ORDER BY id").all() as { name: string }[];
@@ -138,9 +154,28 @@ export function startGame(): void {
   dealRound(1);
 }
 
+export function getCardsInRound(round: number, playerCount: number): number {
+  const maxCards = Math.min(13, Math.floor(51 / playerCount));
+  return round <= maxCards ? round : maxCards * 2 - round;
+}
+
+export function getBidsForRound(round: number): Record<string, number> {
+  const rows = db.prepare("SELECT player_name, bid FROM player_bids WHERE round = ?").all(round) as { player_name: string; bid: number }[];
+  const bids: Record<string, number> = {};
+  for (const row of rows) {
+    bids[row.player_name] = row.bid;
+  }
+  return bids;
+}
+
+export function placeBid(round: number, playerName: string, bid: number): void {
+  db.prepare("INSERT INTO player_bids (round, player_name, bid) VALUES (?, ?, ?)").run(round, playerName, bid);
+}
+
 export function endGame(): void {
   db.prepare("UPDATE game_state SET started = 0, current_round = 0, deck = '[]', trump_card = NULL, dealer_index = 0 WHERE id = 1").run();
   db.prepare("DELETE FROM player_cards").run();
+  db.prepare("DELETE FROM player_bids").run();
   db.prepare("DELETE FROM players").run();
 }
 

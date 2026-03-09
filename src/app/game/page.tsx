@@ -22,6 +22,14 @@ export default function GamePage() {
   const [trumpCard, setTrumpCard] = useState<string | null>(null);
   const [trumpSuit, setTrumpSuit] = useState<string | null>(null);
   const [dealerIndex, setDealerIndex] = useState<number | null>(null);
+
+  const [bids, setBids] = useState<Record<string, number>>({});
+  const [currentBidder, setCurrentBidder] = useState<string | null>(null);
+  const [biddingComplete, setBiddingComplete] = useState(false);
+  const [cardsInRound, setCardsInRound] = useState(0);
+  const [biddingOrder, setBiddingOrder] = useState<string[]>([]);
+  const [bidInput, setBidInput] = useState("");
+
   const router = useRouter();
 
   const suitSymbol: Record<string, string> = { H: "\u2665", D: "\u2666", C: "\u2663", S: "\u2660" };
@@ -49,10 +57,20 @@ export default function GamePage() {
       setTrumpCard(gameData.trumpCard ?? null);
       setTrumpSuit(gameData.trumpSuit ?? null);
       setDealerIndex(gameData.dealerIndex ?? null);
+
+      if (gameData.started && gameData.currentRound > 0) {
+        const bidsRes = await fetch(`/api/bids?round=${gameData.currentRound}`);
+        const bidsData = await bidsRes.json();
+        setBids(bidsData.bids);
+        setBiddingOrder(bidsData.biddingOrder);
+        setCurrentBidder(bidsData.currentBidder);
+        setBiddingComplete(bidsData.biddingComplete);
+        setCardsInRound(bidsData.cardsInRound);
+      }
     }
 
     poll();
-    const interval = setInterval(poll, 5000);
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
   }, [router]);
 
@@ -69,6 +87,28 @@ export default function GamePage() {
     setPlayers([]);
     localStorage.removeItem("playerName");
     router.replace("/");
+  }
+
+  async function handleSubmitBid() {
+    const bid = parseInt(bidInput, 10);
+    if (isNaN(bid) || bid < 0 || bid > cardsInRound) return;
+
+    const res = await fetch("/api/bids", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ player: playerName, round: currentRound, bid }),
+    });
+    if (res.ok) {
+      setBidInput("");
+      // Immediately refresh bidding state
+      const bidsRes = await fetch(`/api/bids?round=${currentRound}`);
+      const bidsData = await bidsRes.json();
+      setBids(bidsData.bids);
+      setBiddingOrder(bidsData.biddingOrder);
+      setCurrentBidder(bidsData.currentBidder);
+      setBiddingComplete(bidsData.biddingComplete);
+      setCardsInRound(bidsData.cardsInRound);
+    }
   }
 
   const maxCards =
@@ -146,11 +186,74 @@ export default function GamePage() {
                     {gameStarted && dealerIndex === i && (
                       <span className="ml-2 text-xs text-muted-foreground">(dealer)</span>
                     )}
+                    {gameStarted && name in bids && (
+                      <span className="ml-2 inline-block rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-800">
+                        Bid: {bids[name]}
+                      </span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+
+          {gameStarted && currentRound > 0 && !biddingComplete && (
+            <div className="flex flex-col gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+              <h3 className="text-center text-sm font-semibold text-amber-900">
+                Bidding — Round {currentRound} ({cardsInRound} {cardsInRound === 1 ? "card" : "cards"})
+              </h3>
+              <div className="flex flex-col gap-1">
+                {biddingOrder.map((name) => (
+                  <div key={name} className="flex items-center justify-between text-sm">
+                    <span className={name === currentBidder ? "font-semibold" : ""}>
+                      {name}
+                      {name === playerName && " (you)"}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {name in bids ? bids[name] : "waiting..."}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              {currentBidder === playerName ? (
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    max={cardsInRound}
+                    value={bidInput}
+                    onChange={(e) => setBidInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleSubmitBid(); }}
+                    className="w-20 rounded border border-input bg-background px-2 py-1 text-sm"
+                    placeholder="0"
+                  />
+                  <Button size="sm" onClick={handleSubmitBid}>
+                    Submit Bid
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">
+                  Waiting for {currentBidder} to bid...
+                </p>
+              )}
+            </div>
+          )}
+
+          {gameStarted && currentRound > 0 && biddingComplete && (
+            <div className="flex flex-col gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
+              <h3 className="text-center text-sm font-semibold text-green-900">
+                Bids — Round {currentRound} ({cardsInRound} {cardsInRound === 1 ? "card" : "cards"})
+              </h3>
+              <div className="flex flex-col gap-1">
+                {biddingOrder.map((name) => (
+                  <div key={name} className="flex items-center justify-between text-sm">
+                    <span>{name}{name === playerName && " (you)"}</span>
+                    <span className="font-medium">{bids[name]}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {gameStarted ? (
             <div className="flex flex-col gap-3">
