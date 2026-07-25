@@ -29,6 +29,7 @@ export default function GamePage() {
   const [cardsInRound, setCardsInRound] = useState(0);
   const [biddingOrder, setBiddingOrder] = useState<string[]>([]);
   const [bidInput, setBidInput] = useState("");
+  const [selectedCard, setSelectedCard] = useState<string | null>(null);
 
   const router = useRouter();
 
@@ -118,6 +119,10 @@ export default function GamePage() {
 
   const totalRounds = maxCards * 2;
 
+  const isPlayingPhase = gameStarted && currentRound > 0 && biddingComplete;
+  const currentTurnPlayer = isPlayingPhase ? biddingOrder[0] : null;
+  const isMyTurn = currentTurnPlayer === playerName;
+
   if (!playerName) return null;
 
   return (
@@ -130,10 +135,17 @@ export default function GamePage() {
               if (card) {
                 const suit = card.slice(-1);
                 const rank = card.slice(0, -1);
+                const isSelected = selectedCard === card;
+                const canSelect = isPlayingPhase && isMyTurn;
                 return (
                   <div
                     key={i}
-                    className={`flex h-24 w-16 flex-col items-center justify-center rounded-lg border-2 border-foreground/20 bg-white shadow-sm ${suitColor[suit]}`}
+                    className={`flex h-24 w-16 flex-col items-center justify-center rounded-lg bg-white shadow-sm ${suitColor[suit]} ${
+                      isSelected
+                        ? "border-4 border-red-600"
+                        : "border-2 border-foreground/20"
+                    } ${canSelect ? "cursor-pointer" : ""}`}
+                    onClick={canSelect ? () => setSelectedCard(isSelected ? null : card) : undefined}
                   >
                     <span className="text-sm font-bold">{rank}</span>
                     <span className="text-lg">{suitSymbol[suit]}</span>
@@ -239,19 +251,32 @@ export default function GamePage() {
             </div>
           )}
 
-          {gameStarted && currentRound > 0 && biddingComplete && (
-            <div className="flex flex-col gap-3 rounded-lg border border-green-200 bg-green-50 p-4">
-              <h3 className="text-center text-sm font-semibold text-green-900">
-                Bids — Round {currentRound} ({cardsInRound} {cardsInRound === 1 ? "card" : "cards"})
+          {isPlayingPhase && (
+            <div className="flex flex-col gap-3 rounded-lg border border-purple-200 bg-purple-50 p-4">
+              <h3 className="text-center text-sm font-semibold text-purple-900">
+                Playing — Round {currentRound} ({cardsInRound} {cardsInRound === 1 ? "card" : "cards"})
               </h3>
               <div className="flex flex-col gap-1">
                 {biddingOrder.map((name) => (
                   <div key={name} className="flex items-center justify-between text-sm">
-                    <span>{name}{name === playerName && " (you)"}</span>
-                    <span className="font-medium">{bids[name]}</span>
+                    <span className={name === currentTurnPlayer ? "font-semibold" : ""}>
+                      {name}{name === playerName && " (you)"}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      Bid: {bids[name]}
+                    </span>
                   </div>
                 ))}
               </div>
+              {isMyTurn ? (
+                <p className="text-center text-sm font-medium text-purple-800">
+                  Your turn! Select a card to play.
+                </p>
+              ) : (
+                <p className="text-center text-sm text-muted-foreground">
+                  Waiting for {currentTurnPlayer} to play...
+                </p>
+              )}
             </div>
           )}
 
